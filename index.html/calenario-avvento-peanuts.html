@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendario dell'Avvento</title>
+<style>
+:root {
+--number-color: rgba(255, 255, 255, 0.38);
+--number-stroke: rgba(65, 82, 108, 0.72);
+--today-color: rgba(255, 250, 220, 0.95);
+--today-stroke: rgba(145, 95, 15, 0.88);
+--bulb-daylight-scale: 1;
+--star-daylight-scale: 0.85;
+--window-light-opacity: 0.75;
+--street-light-opacity: 0.85;
+}
+
+* {
+box-sizing: border-box;
+}
+
+body {
+font-family: 'Comic Sans MS', 'Arial', sans-serif;
+margin: 0;
+min-height: 100vh;
+background-color: #162238;
+color: var(--number-color);
+overflow-x: auto;
+}
+
+.village-board {
+position: relative;
+width: 100%;
+min-width: 960px;
+aspect-ratio: 16 / 9;
+background-color: #162238;
+overflow: hidden;
+box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.village-bg {
+position: absolute;
+inset: 0;
+width: 100%;
+height: 100%;
+object-fit: cover;
+pointer-events: none;
+user-select: none;
+z-index: 1;
+transition: filter 1.2s linear, opacity 1.2s ease;
+}
+
+.village-bg-sleep {
+opacity: 0;
+}
+
+/* Layer atmosfera giorno/notte: concentrato in alto e sfumato verso il basso */
+.daylight-layer {
+position: absolute;
+inset: 0;
+pointer-events: none;
+z-index: 1;
+mix-blend-mode: soft-light;
+}
+
+/* Layer luci calde dalle finestre la sera */
+.window-lights-layer {
+position: absolute;
+inset: 0;
+pointer-events: none;
+z-index: 2;
+opacity: var(--window-light-opacity, 0.75);
+transition: opacity 1.2s linear;
+}
+
+.window-glow {
+position: absolute;
+transform: translate(-50%, -50%);
+border-radius: 3px;
+background: radial-gradient(
+ellipse at center,
+rgba(255, 234, 155, 0.92) 0%,
+rgba(255, 194, 82, 0.58) 52%,
+rgba(255, 165, 45, 0) 100%
+);
+box-shadow:
+0 0 8px rgba(255, 200, 90, 0.75),
+0 0 18px rgba(255, 175, 55, 0.45);
+filter: blur(1.2px);
+mix-blend-mode: screen;
+animation: warmFlicker var(--flicker-dur, 4.5s) ease-in-out infinite;
+animation-delay: var(--flicker-delay, 0s);
+}
+
+@keyframes warmFlicker {
+0%, 100% {
+opacity: 0.88;
+}
+45% {
+opacity: 1;
+}
+70% {
+opacity: 0.78;
+}
+}
+
+/* Layer luci dei lampioni (attive dalle 19:00 alle 04:30) */
+.street-lights-layer {
+position: absolute;
+inset: 0;
+pointer-events: none;
+z-index: 2;
+opacity: var(--street-light-opacity, 0.85);
+transition: opacity 1.2s linear;
+}
+
+.street-lamp-glow {
+position: absolute;
+transform: translate(-50%, -50%);
+border-radius: 50%;
+background: radial-gradient(
+circle,
+rgba(255, 240, 178, 0.96) 0%,
+rgba(255, 204, 102, 0.52) 34%,
+rgba(255, 182, 72, 0.16) 64%,
+rgba(255, 170, 55, 0) 100%
+);
+box-shadow:
+0 0 10px rgba(255, 214, 118, 0.8),
+0 0 24px rgba(255, 190, 80, 0.42);
+filter: blur(1.4px);
+mix-blend-mode: screen;
+animation: lampGlow var(--lamp-dur, 5.2s) ease-in-out infinite;
+animation-delay: var(--lamp-delay, 0s);
+}
+
+@keyframes lampGlow {
+0%, 100% {
+opacity: 0.9;
+}
+50% {
+opacity: 1;
+}
+}
+
+/* Layer fumo dai camini */
+.smoke-layer {
+position: absolute;
+inset: 0;
+pointer-events: none;
+z-index: 2;
+overflow: hidden;
+}
+
+.smoke-emitter {
+position: absolute;
+width: 14px;
+height: 14px;
+transform: translate(-50%, -50%);
+pointer-events: none;
+}
+
+.smoke-puff {
+position: absolute;
+left: 50%;
+top: 50%;
+width: 18px;
+height: 18px;
+border-radius: 50%;
+background: radial-gradient(
+circle,
+rgba(255, 255, 255, 0.78) 0%,
+rgba(232, 238, 248, 0.45) 55%,
+rgba(220, 228, 240, 0) 100%
+);
+filter: blur(2.4px);
+transform: translate(-50%, -50%) scale(0.55);
+opacity: 0;
+animation: riseSmoke var(--dur, 4.8s) ease-out infinite;
+animation-delay: var(--delay, 0s);
+}
+
+.smoke-debug-dot {
+position: absolute;
+left: 50%;
+top: 50%;
+width: 9px;
+height: 9px;
+border-radius: 50%;
+background-color: #ff4d4d;
+border: 2px solid #ffffff;
+transform: translate(-50%, -50%);
+box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+.smoke-debug-banner {
+position: fixed;
+bottom: 12px;
+left: 50%;
+transform: translateX(-50%);
+background-color: rgba(20, 30, 48, 0.94);
+color: #ffffff;
+border: 2px solid #ffd166;
+border-radius: 10px;
+padding: 8px 14px;
+font-size: 0.9rem;
+z-index: 2000;
+box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+text-align: center;
+}
+
+.lights-debug-banner {
+position: fixed;
+bottom: 58px;
+left: 50%;
+transform: translateX(-50%);
+background-color: rgba(20, 30, 48, 0.94);
+color: #ffffff;
+border: 2px solid #72efdd;
+border-radius: 10px;
+padding: 8px 14px;
+font-size: 0.9rem;
+z-index: 2000;
+box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+text-align: center;
+}
+
+.windows-debug-banner {
+position: fixed;
+bottom: 104px;
+left: 50%;
+transform: translateX(-50%);
+background-color: rgba(20, 30, 48, 0.94);
+color: #ffffff;
+border: 2px solid #ffbe55;
+border-radius: 10px;
+padding: 8px 14px;
+font-size: 0.9rem;
+z-index: 2000;
+box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+text-align: center;
+}
+
+@keyframes riseSmoke {
+0% {
+opacity: 0;
+transform: translate(-50%, -20%) scale(0.5);
+}
+18% {
+opacity: 0.82;
+}
+65% {
+opacity: 0.48;
+transform: translate(calc(-50% + var(--drift, 18px)), -42px) scale(1.65);
+}
+100% {
+opacity: 0;
+transform: translate(calc(-50% + calc(var(--drift, 18px) * 1.45)), -76px) scale(2.45);
+}
+}
+
+/* Layer lucine dell'albero di Natale */
+.tree-lights-layer {
+position: absolute;
+inset: 0;
+pointer-events: none;
+z-index: 3;
+opacity: var(--bulb-daylight-scale, 1);
+transition: opacity 1.2s linear;
+}
+
+.tree-bulb {
+position: absolute;
+width: 5px;
+height: 5px;
+border-radius: 50%;
+transform: translate(-50%, -50%);
+background-color: var(--bulb-color, #ffd166);
+box-shadow:
+0 0 4px var(--bulb-color, #ffd166),
+0 0 9px var(--bulb-color, #ffd166);
+animation: twinkleBulb var(--twinkle-dur, 2.6s) ease-in-out infinite;
+animation-delay: var(--twinkle-delay, 0s);
+}
+
+/* Layer luce della stella sull'albero: sempre attiva, più discreta di giorno */
+.star-light-layer {
+position: absolute;
+inset: 0;
+pointer-events: none;
+z-index: 4;
+opacity: var(--star-daylight-scale, 0.85);
+transition: opacity 1.2s linear;
+}
+
+.star-glow {
+position: absolute;
+transform: translate(-50%, -50%);
+border-radius: 50%;
+background: radial-gradient(
+circle,
+rgba(255, 252, 224, 0.98) 0%,
+rgba(255, 223, 110, 0.72) 36%,
+rgba(255, 195, 55, 0.22) 68%,
+rgba(255, 185, 40, 0) 100%
+);
+box-shadow:
+0 0 10px rgba(255, 232, 130, 0.85),
+0 0 22px rgba(255, 205, 75, 0.55);
+filter: blur(0.8px);
+mix-blend-mode: screen;
+animation: starPulse var(--star-dur, 3.8s) ease-in-out infinite;
+}
+
+@keyframes starPulse {
+0%, 100% {
+transform: translate(-50%, -50%) scale(0.92);
+opacity: 0.82;
+}
+50% {
+transform: translate(-50%, -50%) scale(1.14);
+opacity: 1;
+}
+}
+
+/* Lampeggio irregolare e naturale da catena natalizia reale */
+@keyframes twinkleBulb {
+0% {
+opacity: 0.22;
+transform: translate(-50%, -50%) scale(0.75);
+box-shadow: 0 0 1px var(--bulb-color, #ffd166);
+}
+16% {
+opacity: 0.98;
+transform: translate(-50%, -50%) scale(1.18);
+box-shadow:
+0 0 5px var(--bulb-color, #ffd166),
+0 0 11px var(--bulb-color, #ffd166),
+0 0 16px rgba(255, 250, 220, 0.5);
+}
+30% {
+opacity: 0.42;
+transform: translate(-50%, -50%) scale(0.88);
+box-shadow: 0 0 3px var(--bulb-color, #ffd166);
+}
+48% {
+opacity: 1;
+transform: translate(-50%, -50%) scale(1.15);
+box-shadow:
+0 0 6px var(--bulb-color, #ffd166),
+0 0 12px var(--bulb-color, #ffd166);
+}
+72% {
+opacity: 0.28;
+transform: translate(-50%, -50%) scale(0.8);
+box-shadow: 0 0 2px var(--bulb-color, #ffd166);
+}
+86% {
+opacity: 0.85;
+transform: translate(-50%, -50%) scale(1.08);
+box-shadow:
+0 0 4px var(--bulb-color, #ffd166),
+0 0 10px var(--bulb-color, #ffd166);
+}
+100% {
+opacity: 0.22;
+transform: translate(-50%, -50%) scale(0.75);
+box-shadow: 0 0 1px var(--bulb-color, #ffd166);
+}
+}
+
+.reset-debug-btn {
+position: fixed;
+top: 12px;
+right: 12px;
+background-color: rgba(20, 30, 48, 0.92);
+color: #ffffff;
+border: 2px solid #ffd166;
+border-radius: 8px;
+padding: 6px 12px;
+font-family: 'Comic Sans MS', 'Arial', sans-serif;
+font-size: 0.85rem;
+font-weight: bold;
+cursor: pointer;
+z-index: 2000;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.reset-debug-btn:hover,
+.reset-debug-btn:focus-visible {
+background-color: #ffd166;
+color: #141e30;
+}
+
+/* Layer neve */
+#snowCanvas {
+position: absolute;
+inset: 0;
+width: 100%;
+height: 100%;
+pointer-events: none;
+z-index: 5;
+}
+
+.door,
+.door.locked,
+.door.open,
+.door.glow-today,
+.door:hover,
+.door:focus,
+.door:active {
+position: absolute;
+transform: translate(-50%, -50%);
+background: none !important;
+background-color: transparent !important;
+border: none !important;
+border-style: none !important;
+border-width: 0 !important;
+border-radius: 0 !important;
+outline: none !important;
+box-shadow: none !important;
+padding: 0;
+color: var(--number-color) !important;
+-webkit-text-stroke: 1.1px var(--number-stroke);
+font-family: 'Comic Sans MS', 'Arial', sans-serif;
+font-weight: bold;
+display: flex;
+justify-content: center;
+align-items: center;
+cursor: pointer;
+user-select: none;
+transition: transform 0.2s ease, opacity 0.2s ease;
+z-index: 10;
+text-align: center;
+line-height: 1;
+text-shadow:
+0 0 5px rgba(35, 48, 68, 0.75),
+0 1px 4px rgba(35, 48, 68, 0.8);
+}
+
+/* Casella già aperta nei giorni passati: sparisce dal giorno dopo in poi */
+.door.consumed {
+display: none !important;
+pointer-events: none !important;
+}
+
+/* Illuminazione attiva SOLO per la casella del giorno corrente */
+.door.glow-today,
+.door.glow-today:hover,
+.door.glow-today:focus,
+.door.glow-today:active {
+color: var(--today-color) !important;
+-webkit-text-stroke: 1.2px var(--today-stroke);
+animation: todayBeacon 2.1s ease-in-out infinite alternate;
+opacity: 1 !important;
+z-index: 15;
+}
+
+@keyframes todayBeacon {
+0% {
+text-shadow:
+0 0 9px rgba(255, 225, 95, 0.9),
+0 0 18px rgba(255, 190, 40, 0.7),
+0 1px 4px rgba(35, 48, 68, 0.85);
+}
+100% {
+text-shadow:
+0 0 14px rgba(255, 242, 160, 1),
+0 0 26px rgba(255, 195, 35, 0.92),
+0 0 38px rgba(255, 165, 20, 0.65),
+0 1px 4px rgba(35, 48, 68, 0.85);
+}
+}
+
+.door:hover,
+.door:focus-visible,
+.door.size-10:hover,
+.door.size-25:hover {
+transform: translate(-50%, -50%) scale(1.15);
+z-index: 20;
+}
+
+.door.locked {
+opacity: 0.92;
+}
+
+.door.open {
+opacity: 1;
+}
+
+/* Caselle 10 e 25 più grandi delle altre */
+.door.size-10 {
+font-size: 2.1rem;
+}
+
+.door.size-25 {
+font-size: 2.5rem;
+}
+
+/* Dimensioni variegate per le altre caselle */
+.shape-a { font-size: 1.45rem; }
+.shape-b { font-size: 1.35rem; }
+.shape-c { font-size: 1.55rem; }
+.shape-d { font-size: 1.4rem; }
+.shape-e { font-size: 1.5rem; }
+
+/* Finestra Modale (per caselle bloccate o link mancanti) */
+.modal {
+display: none;
+position: fixed;
+inset: 0;
+background-color: rgba(0, 0, 0, 0.78);
+justify-content: center;
+align-items: center;
+z-index: 1000;
+padding: 16px;
+}
+
+.modal-content {
+background-color: #ffffff;
+color: #1a1a1a;
+padding: 25px;
+border-radius: 12px;
+max-width: 520px;
+width: 100%;
+text-align: center;
+position: relative;
+box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+border: 4px solid #1a1a1a;
+}
+
+.close-btn {
+position: absolute;
+top: 10px;
+right: 16px;
+font-size: 1.6rem;
+cursor: pointer;
+font-weight: bold;
+color: #555;
+background: none;
+border: none;
+line-height: 1;
+}
+
+.close-btn:hover,
+.close-btn:focus-visible {
+color: #000;
+}
+</style>
+</head>
+<body>
+
+<button type="button" class="reset-debug-btn" id="resetVisitedBtn" style="display: none;">
+Reset caselle
+</button>
+
+<div class="village-board" id="villageBoard">
+<img src="sfondo-peanuts.jpg" alt="" class="village-bg" id="villageBg">
+<img src="sfondo-peanuts-senza-personaggi.jpg" alt="" class="village-bg village-bg-sleep" id="villageBgSleep">
+<div class="daylight-layer" id="daylightLayer"></div>
+<div class="window-lights-layer" id="windowLightsLayer"></div>
+<div class="street-lights-layer" id="streetLightsLayer"></div>
+<div class="smoke-layer" id="smokeLayer"></div>
+<div class="tree-lights-layer" id="treeLightsLayer"></div>
+<div class="star-light-layer" id="starLightLayer"></div>
+<canvas id="snowCanvas"></canvas>
+</div>
+
+<div class="smoke-debug-banner" id="smokeDebugBanner" style="display: none;">
+Modalità camini attiva: clicca su ogni camino per leggere le coordinate (x, y)
+</div>
+
+<div class="lights-debug-banner" id="lightsDebugBanner" style="display: none;">
+Modalità lucine attiva: clicca sull'albero per leggere le coordinate (x, y)
+</div>
+
+<div class="windows-debug-banner" id="windowsDebugBanner" style="display: none;">
+Modalità finestre attiva: clicca su una finestra per leggere le coordinate (x, y)
+</div>
+
+<div class="modal" id="mediaModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+<div class="modal-content">
+<button type="button" class="close-btn" id="closeModal" aria-label="Chiudi finestra">&times;</button>
+<h2 id="modalTitle"></h2>
+<div class="modal-body" id="modalBody"></div>
+</div>
+</div>
+
+<script>
+// Imposta true per cliccare sui camini della tua immagine e leggere subito x e y
+const SHOW_SMOKE_DEBUG = false;
+
+// Imposta true per cliccare sull'albero di Natale e leggere subito le coordinate (x, y) delle lucine
+const SHOW_LIGHTS_DEBUG = false;
+
+// Imposta true per cliccare sulle finestre e leggere subito le coordinate (x, y) della luce serale
+const SHOW_WINDOWS_DEBUG = false;
+
+// Imposta true per mostrare il pulsante che svuota le caselle visitate (utile per i test)
+const SHOW_RESET_BUTTON = false;
+
+// Per testare un giorno specifico di dicembre (es. 10), imposta un numero 1..25; altrimenti null
+const DEBUG_FORCE_DAY = null;
+
+// Per testare un'ora specifica (es. 4.5 per 04:30, 17.5 per 17:30, 19.0 per 19:00), imposta 0..24; altrimenti null
+const DEBUG_FORCE_HOUR = null;
+
+// Immagine alternativa senza personaggi (usata dalle 21:00 alle 07:00)
+const VILLAGE_NO_CHARS_SRC = 'sfondo-peanuts-senza-personaggi.jpg';
+
+// '_self' apre nella stessa pagina; '_blank' apre in una nuova scheda
+const RAIPLAY_TARGET = '_self';
+
+// Intensità della neve (numero di fiocchi)
+const SNOWFLAKE_COUNT = 85;
+
+// Luce della stella sull'albero: rimane sempre accesa (più discreta di giorno)
+const starLightSpot = { x: 53.8, y: 20.0, size: 1.5, dur: 3.8 };
+
+// 4 luci per i lampioni (x, y, size in %): attive dalle 19:00 alle 04:30
+const streetLightSpots = [
+{ x: 60.2, y: 27.6, size: 5.0, dur: 5.0, delay: -0.7 },
+{ x: 75.7, y: 33.3, size: 5.0, dur: 5.6, delay: -2.1 },
+{ x: 60.1, y: 40.4, size: 5.0, dur: 5.6, delay: -2.1 },
+{ x: 54.9, y: 48.0, size: 5.0, dur: 4.8, delay: -1.4 }
+];
+
+// Coordinate (x, y, w, h in %) e orario di spegnimento opzionale (bedtimeHour in 23.0..24.0) per ciascuna finestra
+const windowLightSpots = [
+{ x: 82.6, y: 87.0, w: 3.4, h: 4.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.55 },
+{ x: 89.4, y: 91.5, w: 3.4, h: 4.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.25 },
+{ x: 7.0, y: 59.4, w: 3.4, h: 4.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.78 },
+{ x: 14.8, y: 55.5, w: 3.4, h: 4.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.88 },
+{ x: 3.2, y: 59.6, w: 2.4, h: 2.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.37 },
+{ x: 1.0, y: 57.5, w: 2.4, h: 2.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.85 },
+{ x: 48.5, y: 22.1, w: 2.0, h: 2.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.91 },
+{ x: 43.5, y: 23.3, w: 1.0, h: 2.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.61 },
+{ x: 41.0, y: 22.6, w: 1.0, h: 2.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.26 },
+{ x: 60.3, y: 19.1, w: 2.0, h: 2.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.40 },
+{ x: 17.4, y: 19.3, w: 1.4, h: 1.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.32 },
+{ x: 5.5, y: 22.5, w: 1.4, h: 1.0, dur: 4.5, delay: -0.5, bedtimeHour: 23.57 }
+];
+
+// Palette delle lucine colorate dell'albero
+const TREE_LIGHT_COLORS = ['#ff4d6d', '#ffd166', '#4cc9f0', '#70e000', '#ff9f1c'];
+
+// Lucine sull'albero (x, y in %): usa SHOW_LIGHTS_DEBUG = true per leggere i punti esatti sull'immagine
+const treeLightSpots = [
+{ x: 54.4, y: 25.5, color: '#ffd166', dur: 3.4, delay: -0.6 },
+{ x: 53.1, y: 25.4, color: '#ff9f1c', dur: 3.9, delay: -2.2 },
+{ x: 53.8, y: 26.5, color: '#ff4d6d', dur: 3.4, delay: -2.8 },
+{ x: 55.2, y: 27.3, color: '#ff4d6d', dur: 1.8, delay: -2.2 },
+{ x: 52.4, y: 27.7, color: '#70e000', dur: 4.0, delay: -2.0 },
+{ x: 51.9, y: 29.1, color: '#ffd166', dur: 2.3, delay: -0.0 },
+{ x: 53.7, y: 29.3, color: '#ff4d6d', dur: 3.6, delay: -1.3 },
+{ x: 55.2, y: 29.3, color: '#70e000', dur: 3.8, delay: -0.6 },
+{ x: 55.8, y: 31.2, color: '#ff9f1c', dur: 3.8, delay: -2.1 },
+{ x: 53.6, y: 30.7, color: '#4cc9f0', dur: 2.6, delay: -0.1 },
+{ x: 51.4, y: 30.4, color: '#ffd166', dur: 3.5, delay: -3.0 },
+{ x: 55.8, y: 35.0, color: '#ffd166', dur: 3.4, delay: -0.7 },
+{ x: 50.1, y: 36.6, color: '#ff9f1c', dur: 2.4, delay: -1.8 },
+{ x: 56.1, y: 36.3, color: '#70e000', dur: 3.8, delay: -0.6 },
+{ x: 56.7, y: 36.9, color: '#ffd166', dur: 4.2, delay: -1.0 },
+{ x: 55.5, y: 39.7, color: '#ff9f1c', dur: 1.9, delay: -2.1 },
+{ x: 52.9, y: 42.5, color: '#ff4d6d', dur: 2.2, delay: -2.2 },
+{ x: 50.6, y: 40.0, color: '#4cc9f0', dur: 3.3, delay: -0.9 },
+{ x: 57.5, y: 41.8, color: '#4cc9f0', dur: 3.7, delay: -0.8 },
+{ x: 54.3, y: 44.6, color: '#ff9f1c', dur: 3.6, delay: -0.1 },
+{ x: 57.4, y: 44.6, color: '#ffd166', dur: 2.6, delay: -2.0 },
+{ x: 50.0, y: 43.3, color: '#ff4d6d', dur: 4.3, delay: -0.7 },
+{ x: 55.6, y: 42.5, color: '#70e000', dur: 2.8, delay: -0.1 },
+{ x: 52.7, y: 45.2, color: '#ff4d6d', dur: 2.8, delay: -0.6 },
+{ x: 48.9, y: 40.2, color: '#ffd166', dur: 4.0, delay: -3.1 },
+{ x: 51.4, y: 42.8, color: '#ff4d6d', dur: 2.4, delay: -2.8 },
+{ x: 55.9, y: 45.7, color: '#ff4d6d', dur: 3.3, delay: -0.0 },
+{ x: 50.6, y: 45.5, color: '#ff4d6d', dur: 2.2, delay: -0.9 },
+{ x: 48.6, y: 42.6, color: '#ff4d6d', dur: 4.0, delay: -0.8 }
+];
+
+// Coordinate dei camini
+const chimneySmokeSpots = [
+{ x: 12.7, y: 33.2, drift: 16, dur: 4.8 },
+{ x: 94.0, y: 65.9, drift: 16, dur: 4.8 },
+{ x: 56.4, y: 12.7, drift: 16, dur: 4.8 },
+{ x: 46.8, y: 14.0, drift: 16, dur: 4.8 },
+{ x: 3.8, y: 14.2, drift: 16, dur: 4.8 },
+{ x: 41.7, y: 80.2, drift: 16, dur: 4.8 },
+{ x: 16.2, y: 12.2, drift: 16, dur: 4.8 }
+];
+
+// Posizione (x, y in %) e stile per ciascuna casella (1 = 01.12 ... 25 = 25.12)
+const doorLayout = {
+1: { x: 11, y: 42, shape: 'shape-a' },
+2: { x: 83, y: 18, shape: 'shape-b' },
+3: { x: 9, y: 16, shape: 'shape-c' },
+4: { x: 18, y: 16, shape: 'shape-e' },
+5: { x: 42, y: 18, shape: 'shape-a' },
+6: { x: 56, y: 17, shape: 'shape-b' },
+7: { x: 28, y: 21, shape: 'shape-c' },
+8: { x: 91, y: 50, shape: 'shape-e' },
+9: { x: 70, y: 24, shape: 'shape-a' },
+10: { x: 16, y: 71, shape: 'size-10' },
+11: { x: 28, y: 47, shape: 'shape-d' },
+12: { x: 92, y: 25, shape: 'shape-b' },
+13: { x: 31, y: 71, shape: 'shape-c' },
+14: { x: 55, y: 73, shape: 'shape-e' },
+15: { x: 82, y: 38, shape: 'shape-a' },
+16: { x: 93, y: 41, shape: 'shape-b' },
+17: { x: 63, y: 53, shape: 'shape-c' },
+18: { x: 40, y: 54, shape: 'shape-d' },
+19: { x: 47, y: 83, shape: 'shape-e' },
+20: { x: 81, y: 72, shape: 'shape-a' },
+21: { x: 73, y: 66, shape: 'shape-d' },
+22: { x: 21, y: 88, shape: 'shape-b' },
+23: { x: 64, y: 87, shape: 'shape-c' },
+24: { x: 38, y: 31, shape: 'shape-e' },
+25: { x: 53, y: 36, shape: 'size-25' }
+};
+
+// Inserisci in raiplayUrl il link alla puntata su RaiPlay per ciascun giorno (01.12 - 25.12)
+const calendarData = {
+  1: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/peanuts-s1e49-snoopy-24de8b8a-2e3d-47b9-b4fd-d5488bc03218.html' },
+  2: { raiplayUrl: 'https://www.raiplay.it/video/2016/10/Peanuts-Ep-13-del-041016-f6b2567b-9638-44ef-ace0-879f14b4ff33.html' },
+  3: { raiplayUrl: 'https://www.raiplay.it/video/2016/10/Peanuts-Ep29-del-271016-d2d214bc-ad3c-4eec-bbe6-698c39fa8db5.html' },
+  4: { raiplayUrl: 'https://www.raiplay.it/video/2016/12/Peanuts-261216-f8b80a97-2bcd-42d4-9f09-32ebdf0f933e.html' },
+  5: { raiplayUrl: 'https://www.raiplay.it/video/2017/01/Peanuts-Ep89-del-12012017-8232590a-ecde-4156-a8dd-d6986137458d.html' },
+  6: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/Peanuts-141116-792391d0-c148-4672-9266-40ab4c847ded.html' },
+  7: { raiplayUrl: 'https://www.raiplay.it/video/2016/10/Peanuts-20102016-d7b60bbb-a3fd-4ba2-be66-901fc1cfe15e.html' },
+  8: { raiplayUrl: 'https://www.raiplay.it/video/2016/09/Peanuts-Ep-7-del-27092016-72321f3d-5c39-4286-bc61-34c0bc1d4723.html' },
+  9: { raiplayUrl: 'https://www.raiplay.it/video/2016/12/Peanuts-Ep-61-del-12122016-3e931cde-9dc4-44f8-b1f2-1c5d3031c2b7.html' },
+  10: { raiplayUrl: 'https://www.raiplay.it/video/2016/10/Peanuts-Ep31-del-31102016-36ef97e7-bac1-45a4-8cc9-53d93cd18cb9.html' },
+  11: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/Peanuts-Ep40-del-111116-363e9b32-4031-4cd2-8ca4-5107fef9f613.html' },
+  12: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/Peanuts-Ep-38-del-09112016-64274e77-48d3-498a-a69a-02b321c6d35c.html' },
+  13: { raiplayUrl: 'https://www.raiplay.it/video/2016/12/Peanuts-08122016-64934272-5571-4b10-a591-1b87d18eda26.html' },
+  14: { raiplayUrl: 'https://www.raiplay.it/video/2016/10/Peanuts-Ep30-del-28102016-eb18dcdc-643e-40e5-844c-26c53e96f63e.html' },
+  15: { raiplayUrl: 'https://www.raiplay.it/video/2017/01/Peanuts-Ep-77-03012017-434a1c1a-1b19-41b0-b988-c8c3f287473e.html' },
+  16: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/Peanuts-231116-2fba74e6-461d-4a62-b714-323220ceaacd.html' },
+  17: { raiplayUrl: 'https://www.raiplay.it/video/2016/12/S1E67---Il-fascino-della-follia-193fc327-6033-4fe9-bcc8-19f9bc27451e.html' },
+  18: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/Peanuts-211116-8bc91d1b-9eec-4bb7-a9d3-51e2a7a404f1.html' },
+  19: { raiplayUrl: 'https://www.raiplay.it/video/2017/01/peanuts-s1e85-fidarsi-e-bene-ba653893-2361-46fb-a085-6e574d05926b.html' },
+  20: { raiplayUrl: 'https://www.raiplay.it/video/2017/01/peantus-s1e93-imparare-a-volare-dc876ec9-8d10-4721-b662-4bc7515d8ad4.html' },
+  21: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/Peanuts-Ep35-del-04112016-2b02e5d9-6a1e-41de-8019-0715b3049e1b.html' },
+  22: { raiplayUrl: 'https://www.raiplay.it/video/2016/12/Peanuts-Ep69-del-22122016-7b3620c0-fba2-46e2-8a80-f5ba9e3409ad.html' },
+  23: { raiplayUrl: 'https://www.raiplay.it/video/2016/10/Peanuts-251016-436a96dd-d978-4b28-8056-3e08fe529136.html' },
+  24: { raiplayUrl: 'https://www.raiplay.it/video/2017/01/peanuts-e-94-a-natale-d9cc26ed-ae76-4b2a-8119-7410df833669.html' },
+  25: { raiplayUrl: 'https://www.raiplay.it/video/2016/11/Peanuts-del-29112016-5eb589cd-f83e-4a79-bc57-3a2c2a7da0d0.html' }
+};
+
+const VISITED_STORAGE_KEY = 'avvento_peanuts_visited_days_v2';
+
+function getVisitedDays() {
+try {
+const raw = localStorage.getItem(VISITED_STORAGE_KEY);
+const parsed = raw ? JSON.parse(raw) : [];
+return Array.isArray(parsed) ? parsed : [];
+} catch {
+return [];
+}
+}
+
+function markDayVisited(day) {
+const list = getVisitedDays();
+if (!list.includes(day)) {
+list.push(day);
+try {
+localStorage.setItem(VISITED_STORAGE_KEY, JSON.stringify(list));
+} catch {}
+}
+}
+
+function clearVisitedDays() {
+try {
+localStorage.removeItem(VISITED_STORAGE_KEY);
+} catch {}
+}
+
+const board = document.getElementById('villageBoard');
+const villageBg = document.getElementById('villageBg');
+const villageBgSleep = document.getElementById('villageBgSleep');
+const daylightLayer = document.getElementById('daylightLayer');
+const windowLightsLayer = document.getElementById('windowLightsLayer');
+const streetLightsLayer = document.getElementById('streetLightsLayer');
+const smokeLayer = document.getElementById('smokeLayer');
+const treeLightsLayer = document.getElementById('treeLightsLayer');
+const starLightLayer = document.getElementById('starLightLayer');
+const smokeDebugBanner = document.getElementById('smokeDebugBanner');
+const lightsDebugBanner = document.getElementById('lightsDebugBanner');
+const windowsDebugBanner = document.getElementById('windowsDebugBanner');
+const resetVisitedBtn = document.getElementById('resetVisitedBtn');
+const snowCanvas = document.getElementById('snowCanvas');
+const snowCtx = snowCanvas.getContext('2d');
+const modal = document.getElementById('mediaModal');
+const closeModal = document.getElementById('closeModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalBody = document.getElementById('modalBody');
+
+villageBgSleep.src = VILLAGE_NO_CHARS_SRC;
+
+// Ciclo invernale: scuro graduale dalle 17:00; stella sempre accesa; lampioni attivi dalle 19:00 alle 04:30
+const DAYLIGHT_KEYFRAMES = [
+// { hour, brightness, contrast, saturate, topRgb: [r,g,b], topAlpha, bulbScale, starScale, windowOpacity, streetOpacity }
+{ hour: 0.0, brightness: 0.64, contrast: 1.06, saturate: 0.80, topRgb: [16, 30, 66], topAlpha: 0.28, bulbScale: 1.00, starScale: 0.96, windowOpacity: 0.04, streetOpacity: 0.90 },
+{ hour: 4.2, brightness: 0.65, contrast: 1.06, saturate: 0.80, topRgb: [18, 32, 70], topAlpha: 0.27, bulbScale: 0.98, starScale: 0.95, windowOpacity: 0.04, streetOpacity: 0.90 },
+{ hour: 4.6, brightness: 0.66, contrast: 1.06, saturate: 0.81, topRgb: [20, 35, 74], topAlpha: 0.26, bulbScale: 0.96, starScale: 0.92, windowOpacity: 0.04, streetOpacity: 0.00 },
+{ hour: 7.2, brightness: 0.86, contrast: 1.02, saturate: 0.95, topRgb: [240, 162, 134], topAlpha: 0.12, bulbScale: 0.72, starScale: 0.45, windowOpacity: 0.04, streetOpacity: 0.00 },
+{ hour: 9.0, brightness: 1.02, contrast: 1.00, saturate: 1.03, topRgb: [220, 236, 255], topAlpha: 0.05, bulbScale: 0.55, starScale: 0.24, windowOpacity: 0.04, streetOpacity: 0.00 },
+{ hour: 16.5, brightness: 1.00, contrast: 1.00, saturate: 1.02, topRgb: [224, 238, 255], topAlpha: 0.05, bulbScale: 0.58, starScale: 0.26, windowOpacity: 0.06, streetOpacity: 0.00 },
+{ hour: 17.0, brightness: 0.96, contrast: 1.01, saturate: 1.00, topRgb: [236, 178, 126], topAlpha: 0.09, bulbScale: 0.70, starScale: 0.45, windowOpacity: 0.25, streetOpacity: 0.00 },
+{ hour: 18.0, brightness: 0.82, contrast: 1.04, saturate: 0.92, topRgb: [68, 68, 118], topAlpha: 0.18, bulbScale: 0.88, starScale: 0.75, windowOpacity: 0.65, streetOpacity: 0.00 },
+{ hour: 19.0, brightness: 0.71, contrast: 1.05, saturate: 0.85, topRgb: [22, 36, 76], topAlpha: 0.24, bulbScale: 0.98, starScale: 0.92, windowOpacity: 0.85, streetOpacity: 0.88 },
+{ hour: 23.0, brightness: 0.66, contrast: 1.06, saturate: 0.81, topRgb: [18, 32, 70], topAlpha: 0.27, bulbScale: 1.00, starScale: 0.96, windowOpacity: 0.85, streetOpacity: 0.90 },
+{ hour: 24.0, brightness: 0.64, contrast: 1.06, saturate: 0.80, topRgb: [16, 30, 66], topAlpha: 0.28, bulbScale: 1.00, starScale: 0.96, windowOpacity: 0.04, streetOpacity: 0.90 }
+];
+
+function lerp(a, b, t) {
+return a + (b - a) * t;
+}
+
+function getCurrentHourFloat() {
+if (typeof DEBUG_FORCE_HOUR === 'number' && DEBUG_FORCE_HOUR >= 0 && DEBUG_FORCE_HOUR <= 24) {
+return DEBUG_FORCE_HOUR;
+}
+const now = new Date();
+return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+}
+
+function shouldHideCharacters(hour) {
+return hour >= 21 || hour < 7;
+}
+
+// Crea la luce della stella sull'albero (sempre attiva)
+const starEl = document.createElement('span');
+starEl.className = 'star-glow';
+starEl.style.left = `${starLightSpot.x}%`;
+starEl.style.top = `${starLightSpot.y}%`;
+starEl.style.width = `${starLightSpot.size || 3.4}%`;
+starEl.style.height = `${(starLightSpot.size || 3.4) * (16 / 9)}%`;
+starEl.style.setProperty('--star-dur', `${starLightSpot.dur || 3.8}s`);
+starLightLayer.appendChild(starEl);
+
+// Crea le 3 luci per i lampioni
+streetLightSpots.forEach((spot, idx) => {
+const lamp = document.createElement('span');
+lamp.className = 'street-lamp-glow';
+lamp.style.left = `${spot.x}%`;
+lamp.style.top = `${spot.y}%`;
+lamp.style.width = `${spot.size || 5.5}%`;
+lamp.style.height = `${(spot.size || 5.5) * (16 / 9)}%`;
+lamp.style.setProperty('--lamp-dur', `${spot.dur || 5.2}s`);
+lamp.style.setProperty('--lamp-delay', `${spot.delay ?? -(idx * 1.1)}s`);
+streetLightsLayer.appendChild(lamp);
+});
+
+// Crea luci calde sulle finestre con orario di spegnimento sfalsato tra le 23:00 e mezzanotte
+const windowGlowItems = windowLightSpots.map((spot, idx) => {
+const win = document.createElement('span');
+win.className = 'window-glow';
+win.style.left = `${spot.x}%`;
+win.style.top = `${spot.y}%`;
+win.style.width = `${spot.w || 3.4}%`;
+win.style.height = `${spot.h || 4.0}%`;
+win.style.setProperty('--flicker-dur', `${spot.dur || 4.5}s`);
+win.style.setProperty('--flicker-delay', `${spot.delay ?? -(idx * 0.9)}s`);
+windowLightsLayer.appendChild(win);
+
+const fallbackBedtime = 23.15 + ((idx * 0.19) % 0.80);
+const bedtimeHour = typeof spot.bedtimeHour === 'number'
+? Math.min(24.0, Math.max(23.02, spot.bedtimeHour))
+: fallbackBedtime;
+
+return { el: win, bedtimeHour };
+});
+
+function updateStaggeredWindows(hour, baseWindowOpacity) {
+const fadeWindowSpan = 0.25; // ~15 minuti di dissolvenza prima del proprio spegnimento
+for (const item of windowGlowItems) {
+let factor = 1;
+if (hour >= 23.0) {
+if (hour >= item.bedtimeHour) {
+factor = 0;
+} else if (hour > item.bedtimeHour - fadeWindowSpan) {
+factor = (item.bedtimeHour - hour) / fadeWindowSpan;
+}
+}
+const finalOpacity = Math.max(0.04, baseWindowOpacity * factor);
+item.el.style.opacity = finalOpacity.toFixed(2);
+}
+}
+
+function updateDaylightCycle() {
+const h = getCurrentHourFloat();
+let start = DAYLIGHT_KEYFRAMES[0];
+let end = DAYLIGHT_KEYFRAMES[DAYLIGHT_KEYFRAMES.length - 1];
+
+for (let i = 0; i < DAYLIGHT_KEYFRAMES.length - 1; i++) {
+if (h >= DAYLIGHT_KEYFRAMES[i].hour && h <= DAYLIGHT_KEYFRAMES[i + 1].hour) {
+start = DAYLIGHT_KEYFRAMES[i];
+end = DAYLIGHT_KEYFRAMES[i + 1];
+break;
+}
+}
+
+const span = Math.max(0.0001, end.hour - start.hour);
+const t = Math.min(1, Math.max(0, (h - start.hour) / span));
+
+const brightness = lerp(start.brightness, end.brightness, t).toFixed(3);
+const contrast = lerp(start.contrast, end.contrast, t).toFixed(3);
+const saturate = lerp(start.saturate, end.saturate, t).toFixed(3);
+const r = Math.round(lerp(start.topRgb[0], end.topRgb[0], t));
+const g = Math.round(lerp(start.topRgb[1], end.topRgb[1], t));
+const b = Math.round(lerp(start.topRgb[2], end.topRgb[2], t));
+const topAlpha = lerp(start.topAlpha, end.topAlpha, t).toFixed(3);
+const bulbScale = lerp(start.bulbScale, end.bulbScale, t).toFixed(2);
+const starScale = lerp(start.starScale, end.starScale, t).toFixed(2);
+const windowOpacity = lerp(start.windowOpacity, end.windowOpacity, t);
+const streetOpacity = lerp(start.streetOpacity, end.streetOpacity, t).toFixed(2);
+
+const filterValue = `brightness(${brightness}) contrast(${contrast}) saturate(${saturate})`;
+villageBg.style.filter = filterValue;
+villageBgSleep.style.filter = filterValue;
+villageBgSleep.style.opacity = shouldHideCharacters(h) ? '1' : '0';
+
+daylightLayer.style.background = `linear-gradient(to bottom, rgba(${r}, ${g}, ${b}, ${topAlpha}) 0%, rgba(${r}, ${g}, ${b}, 0) 62%)`;
+document.documentElement.style.setProperty('--bulb-daylight-scale', bulbScale);
+document.documentElement.style.setProperty('--star-daylight-scale', starScale);
+document.documentElement.style.setProperty('--window-light-opacity', windowOpacity.toFixed(2));
+document.documentElement.style.setProperty('--street-light-opacity', streetOpacity);
+updateStaggeredWindows(h, windowOpacity);
+}
+
+updateDaylightCycle();
+setInterval(updateDaylightCycle, 30000);
+
+if (SHOW_WINDOWS_DEBUG) {
+windowsDebugBanner.style.display = 'block';
+board.addEventListener('click', (event) => {
+if (event.target.closest('.door')) return;
+const rect = board.getBoundingClientRect();
+const x = (((event.clientX - rect.left) / rect.width) * 100).toFixed(1);
+const y = (((event.clientY - rect.top) / rect.height) * 100).toFixed(1);
+const randomBedtime = (23.1 + Math.random() * 0.85).toFixed(2);
+windowsDebugBanner.innerHTML = `Finestra cliccata: <strong>{ x: ${x}, y: ${y}, w: 3.4, h: 4.0, dur: 4.5, delay: -0.5, bedtimeHour: ${randomBedtime} }</strong>`;
+});
+}
+
+if (SHOW_RESET_BUTTON) {
+resetVisitedBtn.style.display = 'inline-block';
+resetVisitedBtn.addEventListener('click', () => {
+clearVisitedDays();
+refreshDoorsAppearance();
+openInfoModal('Reset completato', 'Tutte le caselle visitate sono state ripristinate.');
+});
+}
+
+// Crea lucine colorate sull'albero di Natale con ritmi variati
+treeLightSpots.forEach((spot, idx) => {
+const bulb = document.createElement('span');
+bulb.className = 'tree-bulb';
+const color = spot.color || TREE_LIGHT_COLORS[idx % TREE_LIGHT_COLORS.length];
+const fallbackDur = 1.8 + ((idx * 37) % 26) / 10;
+const fallbackDelay = -(((idx * 53) % 35) / 10);
+bulb.style.left = `${spot.x}%`;
+bulb.style.top = `${spot.y}%`;
+bulb.style.setProperty('--bulb-color', color);
+bulb.style.setProperty('--twinkle-dur', `${spot.dur || fallbackDur.toFixed(1)}s`);
+bulb.style.setProperty('--twinkle-delay', `${spot.delay ?? fallbackDelay.toFixed(1)}s`);
+treeLightsLayer.appendChild(bulb);
+});
+
+if (SHOW_LIGHTS_DEBUG) {
+lightsDebugBanner.style.display = 'block';
+board.addEventListener('click', (event) => {
+if (event.target.closest('.door')) return;
+const rect = board.getBoundingClientRect();
+const x = (((event.clientX - rect.left) / rect.width) * 100).toFixed(1);
+const y = (((event.clientY - rect.top) / rect.height) * 100).toFixed(1);
+const color = TREE_LIGHT_COLORS[Math.floor(Math.random() * TREE_LIGHT_COLORS.length)];
+const dur = (1.8 + Math.random() * 2.5).toFixed(1);
+const delay = (-Math.random() * 3.2).toFixed(1);
+lightsDebugBanner.innerHTML = `Lucina cliccata: <strong>{ x: ${x}, y: ${y}, color: '${color}', dur: ${dur}, delay: ${delay} }</strong>`;
+});
+}
+
+// Crea sbuffi di fumo per ogni camino configurato
+chimneySmokeSpots.forEach((spot, spotIdx) => {
+const emitter = document.createElement('div');
+emitter.className = 'smoke-emitter';
+emitter.style.left = `${spot.x}%`;
+emitter.style.top = `${spot.y}%`;
+
+const puffCount = 5;
+for (let i = 0; i < puffCount; i++) {
+const puff = document.createElement('span');
+puff.className = 'smoke-puff';
+const dur = spot.dur || 4.8;
+const delay = -((dur / puffCount) * i + spotIdx * 0.35);
+const drift = (spot.drift || 16) * (i % 2 === 0 ? 1 : 0.75);
+puff.style.setProperty('--dur', `${dur}s`);
+puff.style.setProperty('--delay', `${delay.toFixed(2)}s`);
+puff.style.setProperty('--drift', `${drift}px`);
+emitter.appendChild(puff);
+}
+
+if (SHOW_SMOKE_DEBUG) {
+const dot = document.createElement('span');
+dot.className = 'smoke-debug-dot';
+emitter.appendChild(dot);
+}
+
+smokeLayer.appendChild(emitter);
+});
+
+if (SHOW_SMOKE_DEBUG) {
+smokeDebugBanner.style.display = 'block';
+board.addEventListener('click', (event) => {
+if (event.target.closest('.door')) return;
+const rect = board.getBoundingClientRect();
+const x = (((event.clientX - rect.left) / rect.width) * 100).toFixed(1);
+const y = (((event.clientY - rect.top) / rect.height) * 100).toFixed(1);
+smokeDebugBanner.innerHTML = `Camino cliccato: <strong>{ x: ${x}, y: ${y}, drift: 16, dur: 4.8 }</strong>`;
+});
+}
+
+// Neve animata su canvas con discesa rallentata
+let flakes = [];
+
+function resizeSnowCanvas() {
+const rect = board.getBoundingClientRect();
+const dpr = window.devicePixelRatio || 1;
+snowCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+snowCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+snowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+return { width: rect.width, height: rect.height };
+}
+
+function createFlakes(width, height) {
+flakes = Array.from({ length: SNOWFLAKE_COUNT }, () => ({
+x: Math.random() * width,
+y: Math.random() * height,
+r: 1.4 + Math.random() * 2.8,
+speedY: 0.28 + Math.random() * 0.4,
+swayAmp: 0.4 + Math.random() * 0.9,
+swayFreq: 0.008 + Math.random() * 0.015,
+phase: Math.random() * Math.PI * 2,
+alpha: 0.45 + Math.random() * 0.45
+}));
+}
+
+function updateAndDrawSnow() {
+const rect = board.getBoundingClientRect();
+const width = rect.width;
+const height = rect.height;
+
+if (flakes.length === 0) {
+createFlakes(width, height);
+}
+
+snowCtx.clearRect(0, 0, width, height);
+
+for (const f of flakes) {
+f.phase += f.swayFreq;
+f.y += f.speedY;
+f.x += Math.sin(f.phase) * f.swayAmp;
+
+if (f.y - f.r > height) {
+f.y = -f.r - 4;
+f.x = Math.random() * width;
+}
+if (f.x > width + 10) {
+f.x = -10;
+} else if (f.x < -10) {
+f.x = width + 10;
+}
+
+snowCtx.beginPath();
+snowCtx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+snowCtx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
+snowCtx.fill();
+}
+
+requestAnimationFrame(updateAndDrawSnow);
+}
+
+const initialSize = resizeSnowCanvas();
+createFlakes(initialSize.width, initialSize.height);
+
+window.addEventListener('resize', () => {
+const { width, height } = resizeSnowCanvas();
+for (const f of flakes) {
+if (f.x > width) f.x = Math.random() * width;
+if (f.y > height) f.y = Math.random() * height;
+}
+});
+
+requestAnimationFrame(updateAndDrawSnow);
+
+function formatDayLabel(day) {
+return `${String(day).padStart(2, '0')}.12`;
+}
+
+function getActiveDay() {
+if (typeof DEBUG_FORCE_DAY === 'number' && DEBUG_FORCE_DAY >= 1 && DEBUG_FORCE_DAY <= 25) {
+return DEBUG_FORCE_DAY;
+}
+const now = new Date();
+return (now.getMonth() + 1) === 12 ? now.getDate() : 0;
+}
+
+function isDayUnlocked(day) {
+return getActiveDay() >= day;
+}
+
+function isTodayDay(day) {
+return getActiveDay() === day;
+}
+
+function openInfoModal(title, message) {
+modalTitle.textContent = title;
+modalBody.innerHTML = `<p style="font-size: 1.15rem;">${message}</p>`;
+modal.style.display = 'flex';
+}
+
+function closeInfoModal() {
+modal.style.display = 'none';
+}
+
+const doorElements = {};
+
+function refreshDoorsAppearance() {
+const visited = getVisitedDays();
+const activeDay = getActiveDay();
+
+for (let day = 1; day <= 25; day++) {
+const door = doorElements[day];
+if (!door) continue;
+
+door.classList.remove('glow-today', 'locked', 'consumed', 'open');
+
+const unlocked = isDayUnlocked(day);
+const isToday = isTodayDay(day);
+const wasVisited = visited.includes(day);
+
+if (activeDay > 0 && activeDay > day && wasVisited) {
+door.classList.add('consumed');
+continue;
+}
+
+if (isToday) {
+door.classList.add('glow-today');
+}
+
+if (!unlocked) {
+door.classList.add('locked');
+} else if (wasVisited) {
+door.classList.add('open');
+}
+}
+}
+
+for (let day = 1; day <= 25; day++) {
+const cfg = doorLayout[day];
+const door = document.createElement('button');
+door.type = 'button';
+door.classList.add('door', cfg.shape);
+door.style.left = `${cfg.x}%`;
+door.style.top = `${cfg.y}%`;
+door.textContent = String(day);
+door.setAttribute('aria-label', `Casella ${formatDayLabel(day)}`);
+
+door.addEventListener('click', () => {
+if (!isDayUnlocked(day)) {
+openInfoModal(
+formatDayLabel(day),
+`Questa casella si aprirà il <strong>${formatDayLabel(day)}</strong>.`
+);
+return;
+}
+
+markDayVisited(day);
+refreshDoorsAppearance();
+
+const url = calendarData[day] && calendarData[day].raiplayUrl
+? calendarData[day].raiplayUrl.trim()
+: '';
+
+if (url) {
+if (RAIPLAY_TARGET === '_blank') {
+window.open(url, '_blank', 'noopener,noreferrer');
+} else {
+window.location.href = url;
+}
+} else {
+openInfoModal(
+formatDayLabel(day),
+`Nessun link RaiPlay impostato per il <strong>${formatDayLabel(day)}</strong>.`
+);
+}
+});
+
+doorElements[day] = door;
+board.appendChild(door);
+}
+
+refreshDoorsAppearance();
+
+closeModal.addEventListener('click', closeInfoModal);
+
+window.addEventListener('click', (event) => {
+if (event.target === modal) {
+closeInfoModal();
+}
+});
+
+window.addEventListener('keydown', (event) => {
+if (event.key === 'Escape' && modal.style.display === 'flex') {
+closeInfoModal();
+}
+});
+</script>
+</body>
+</html>
+
